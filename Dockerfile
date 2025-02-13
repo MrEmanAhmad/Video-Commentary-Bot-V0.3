@@ -128,6 +128,11 @@ COPY sample_generated_videos/*.mp4 /app/sample_generated_videos/
 # Copy the entire application
 COPY . .
 
+# Create example configuration files
+RUN cp railway.json.example railway.json || true && \
+    mkdir -p credentials && \
+    cp credentials/google_credentials.example.json credentials/google_credentials.json || true
+
 # Set proper permissions
 RUN chown -R app_user:app_user \
     /app \
