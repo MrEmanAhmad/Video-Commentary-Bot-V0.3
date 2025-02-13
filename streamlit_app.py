@@ -195,12 +195,12 @@ try:
                     auth_placeholder.info("🔄 Opening Google Sign-in window...")
                     
                     try:
-                        # Run the local server flow in a new window
+                        # Run the local server flow in a new window with dynamic port
                         credentials = flow.run_local_server(
                             host='localhost',
-                            port=8502,
-                            authorization_prompt_message='',
-                            success_message='Authentication successful! You can close this window.',
+                            port=0,  # Use dynamic port
+                            authorization_prompt_message='Please check your browser for the authentication window.',
+                            success_message='Authentication successful! You can close this window and return to the app.',
                             open_browser=True
                         )
                         
@@ -225,8 +225,12 @@ try:
                         auth_placeholder.success(f"✅ Successfully signed in as {user_info['email']}")
                         st.rerun()
                     except Exception as e:
-                        auth_placeholder.error(f"❌ Authentication failed: {str(e)}")
-                        logger.error(f"Authentication error: {str(e)}")
+                        if "Address already in use" in str(e):
+                            auth_placeholder.error("❌ Authentication server port is busy. Please wait a moment and try again.")
+                            logger.error(f"Port conflict during authentication: {str(e)}")
+                        else:
+                            auth_placeholder.error(f"❌ Authentication failed: {str(e)}")
+                            logger.error(f"Authentication error: {str(e)}")
                 else:
                     st.error("❌ Failed to initialize Google authentication")
             except Exception as e:
