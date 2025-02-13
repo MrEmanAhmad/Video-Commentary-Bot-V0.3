@@ -59,33 +59,84 @@ try:
     def get_google_auth_flow():
         """Create and return Google OAuth flow"""
         try:
-            # Load client secrets from railway.json
-            with open('railway.json', 'r') as f:
-                config = json.load(f)
-                client_secrets = json.loads(config['YOUTUBE_CLIENT_SECRETS'])
+            # First try to get client secrets from environment variable
+            client_secrets = None
+            if os.getenv('YOUTUBE_CLIENT_SECRETS'):
+                logger.info("Loading client secrets from environment variable")
+                secrets_data = os.getenv('YOUTUBE_CLIENT_SECRETS')
+                # Handle both string and dictionary formats
+                if isinstance(secrets_data, str):
+                    try:
+                        client_secrets = json.loads(secrets_data)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse YOUTUBE_CLIENT_SECRETS from environment: {e}")
+                else:
+                    client_secrets = secrets_data
             
-            # Create temporary secrets file
+            # If not in environment, try railway.json
+            if not client_secrets and os.path.exists('railway.json'):
+                logger.info("Loading client secrets from railway.json")
+                with open('railway.json', 'r') as f:
+                    config = json.load(f)
+                    if 'YOUTUBE_CLIENT_SECRETS' in config:
+                        secrets_data = config['YOUTUBE_CLIENT_SECRETS']
+                        # Handle both string and dictionary formats
+                        if isinstance(secrets_data, str):
+                            try:
+                                client_secrets = json.loads(secrets_data)
+                            except json.JSONDecodeError as e:
+                                logger.error(f"Failed to parse YOUTUBE_CLIENT_SECRETS from railway.json: {e}")
+                        else:
+                            client_secrets = secrets_data
+            
+            if not client_secrets:
+                logger.error("No client secrets found in environment or railway.json")
+                st.error("❌ YouTube client secrets not found. Please check your configuration.")
+                return None
+            
+            # Ensure client_secrets is a dictionary with proper format
+            if not isinstance(client_secrets, dict):
+                logger.error("Client secrets must be a dictionary")
+                st.error("❌ Invalid YouTube client secrets format")
+                return None
+            
+            # Create temporary secrets file with proper format
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                json.dump(client_secrets, f)
+                # Ensure proper format for client secrets
+                if 'installed' in client_secrets:
+                    secrets_content = {'installed': client_secrets['installed']}
+                elif 'web' in client_secrets:
+                    secrets_content = {'web': client_secrets['web']}
+                else:
+                    secrets_content = {'installed': client_secrets}  # Assume it's already in correct format
+                
+                json.dump(secrets_content, f)
                 temp_secrets_path = f.name
+                logger.info("Created temporary secrets file with proper format")
             
-            # Create flow with required scopes
-            flow = InstalledAppFlow.from_client_secrets_file(
-                temp_secrets_path,
-                scopes=[
-                    'https://www.googleapis.com/auth/youtube',
-                    'https://www.googleapis.com/auth/youtube.upload',
-                    'https://www.googleapis.com/auth/userinfo.email',
-                    'https://www.googleapis.com/auth/userinfo.profile',
-                    'openid'
-                ]
-            )
-            
-            # Clean up temporary file
-            os.unlink(temp_secrets_path)
-            return flow
+            try:
+                # Create flow with required scopes
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    temp_secrets_path,
+                    scopes=[
+                        'https://www.googleapis.com/auth/youtube',
+                        'https://www.googleapis.com/auth/youtube.upload',
+                        'https://www.googleapis.com/auth/userinfo.email',
+                        'https://www.googleapis.com/auth/userinfo.profile',
+                        'openid'
+                    ]
+                )
+                logger.info("Successfully created OAuth flow")
+                return flow
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_secrets_path):
+                    os.unlink(temp_secrets_path)
+                    logger.info("Cleaned up temporary secrets file")
+        
         except Exception as e:
             logger.error(f"Error setting up Google auth flow: {e}")
+            st.error(f"❌ Failed to set up Google authentication: {str(e)}")
             return None
 
     def get_user_info(credentials):
@@ -195,20 +246,15 @@ try:
             else:
                 logger.warning(f"✗ Missing {var} in environment")
         
-        # Try to load from railway.json if any variables are missing
-        if missing_vars:
-            logger.info("Some variables missing, checking railway.json...")
-            railway_file = Path("railway.json")
-            if railway_file.exists():
-                logger.info("Found railway.json, loading configuration...")
-                with open(railway_file, 'r') as f:
-                    config = json.load(f)
+        # Try to load from railway.json if any variables are missing and file exists
+        if missing_vars and os.path.exists('railway.json'):
+            logger.info("Some variables missing, loading from railway.json...")
+            with open('railway.json', 'r') as f:
+                config = json.load(f)
                 for var in missing_vars:
                     if var in config:
                         os.environ[var] = str(config[var])
                         logger.info(f"Loaded {var} from railway.json")
-            else:
-                logger.warning("railway.json not found")
         
         # Final check for required variables
         still_missing = [var for var in required_vars if not os.getenv(var)]
