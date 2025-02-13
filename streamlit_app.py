@@ -80,35 +80,6 @@ try:
         st.session_state.google_auth = load_user_auth()
     if 'user_info' not in st.session_state:
         st.session_state.user_info = None
-    if 'auth_in_progress' not in st.session_state:
-        st.session_state.auth_in_progress = False
-    if 'auth_error' not in st.session_state:
-        st.session_state.auth_error = None
-
-    def save_credentials(credentials, user_info):
-        """Save credentials and update session state"""
-        try:
-            # Save to file
-            tokens_dir = Path.home() / '.video_bot' / 'tokens'
-            tokens_dir.mkdir(parents=True, exist_ok=True)
-            safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
-            token_path = tokens_dir / f'{safe_email}_token.pickle'
-            
-            with open(token_path, 'wb') as token:
-                pickle.dump(credentials, token)
-            
-            # Update session state
-            st.session_state.google_auth = credentials
-            st.session_state.user_info = user_info
-            st.session_state.auth_in_progress = False
-            st.session_state.auth_error = None
-            
-            logger.info(f"Successfully saved credentials for {user_info['email']}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to save credentials: {e}")
-            st.session_state.auth_error = f"Failed to save credentials: {str(e)}"
-            return False
 
     def get_google_auth_flow():
         """Create and return Google OAuth flow"""
@@ -118,6 +89,7 @@ try:
             if os.getenv('YOUTUBE_CLIENT_SECRETS'):
                 logger.info("Loading client secrets from environment variable")
                 secrets_data = os.getenv('YOUTUBE_CLIENT_SECRETS')
+                # Handle both string and dictionary formats
                 if isinstance(secrets_data, str):
                     try:
                         client_secrets = json.loads(secrets_data)
@@ -172,7 +144,7 @@ try:
                 )
                 
                 # Configure flow for in-app authentication
-                flow.redirect_uri = 'http://localhost:8502'
+                flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app'
                 
                 logger.info("OAuth flow configured successfully")
                 return flow
@@ -207,119 +179,83 @@ try:
     # Show login interface if not authenticated
     if not st.session_state.google_auth:
         st.title("🎬 AI Video Commentary Bot")
+        st.markdown("### Welcome! Please sign in with Google to continue")
         
-        # Center the content
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("""
-            ### Welcome! 👋
-            Sign in with Google to:
-            - Upload videos to YouTube
-            - Save your preferences
-            - Access premium features
-            """)
-            
-            # Custom CSS for the sign-in button
-            st.markdown("""
-            <style>
-            .google-button {
-                background-color: #4285F4;
-                color: white;
-                padding: 12px 24px;
-                border-radius: 4px;
-                border: none;
-                font-size: 16px;
-                font-weight: 500;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                width: 100%;
-                max-width: 300px;
-                margin: 20px auto;
-                transition: background-color 0.3s;
-            }
-            .google-button:hover {
-                background-color: #357ABD;
-            }
-            .google-button img {
-                margin-right: 12px;
-                width: 20px;
-                height: 20px;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # Show any previous error
-            if st.session_state.auth_error:
-                st.error(st.session_state.auth_error)
-            
-            if not st.session_state.auth_in_progress:
-                if st.button("🔑 Continue with Google", key="google_signin", use_container_width=True):
+        if st.button("🔑 Sign in with Google", key="google_signin"):
+            try:
+                flow = get_google_auth_flow()
+                if flow:
+                    # Show loading message
+                    auth_placeholder = st.empty()
+                    auth_placeholder.info("🔄 Preparing Google Sign-in...")
+                    
                     try:
-                        flow = get_google_auth_flow()
-                        if flow:
-                            auth_placeholder = st.empty()
-                            auth_placeholder.info("🔄 Preparing Google Sign-in...")
-                            
+                        # Get the authorization URL with access type and prompt
+                        auth_url, _ = flow.authorization_url(
+                            access_type='offline',
+                            prompt='consent',
+                            include_granted_scopes='true'
+                        )
+                        
+                        # Show the authentication instructions
+                        st.markdown("""
+                        ### Google Sign-in Instructions
+                        1. Click the link below to open Google's sign-in page
+                        2. Sign in with your Google account
+                        3. Grant the required permissions
+                        4. You will be redirected back to this app automatically
+                        """)
+                        
+                        # Display the auth URL as a clickable link
+                        st.markdown(f"[🔐 Click here to sign in with Google]({auth_url})")
+                        
+                        # Add info about the process
+                        st.info("After clicking the link, you'll be redirected back to this app automatically. If you see any errors, please refresh this page.")
+                        auth_code = st.text_input(
+                            "Enter the authorization code from the URL:",
+                            help="Look for the code parameter in the URL after being redirected",
+                            key="auth_code"
+                        )
+                        
+                        if auth_code:
                             try:
-                                auth_url, _ = flow.authorization_url(
-                                    access_type='offline',
-                                    prompt='consent',
-                                    include_granted_scopes='true'
-                                )
+                                # Exchange auth code for credentials
+                                flow.fetch_token(code=auth_code)
+                                credentials = flow.credentials
                                 
-                                st.session_state.auth_flow = flow
-                                st.session_state.auth_in_progress = True
+                                # Get user info
+                                user_info = get_user_info(credentials)
+                                if not user_info:
+                                    st.error("❌ Failed to get user information")
+                                    st.stop()
                                 
-                                # Open auth URL in new tab
-                                st.markdown(f'<meta http-equiv="refresh" content="0;url={auth_url}">', unsafe_allow_html=True)
+                                # Save credentials
+                                tokens_dir = Path.home() / '.video_bot' / 'tokens'
+                                tokens_dir.mkdir(parents=True, exist_ok=True)
+                                safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
+                                token_path = tokens_dir / f'{safe_email}_token.pickle'
                                 
-                                st.info("If the Google sign-in page doesn't open automatically, [click here](%s)" % auth_url)
+                                with open(token_path, 'wb') as token:
+                                    pickle.dump(credentials, token)
+                                
+                                # Store in session state
+                                st.session_state.google_auth = credentials
+                                st.session_state.user_info = user_info
+                                st.success(f"✅ Successfully signed in as {user_info['email']}")
+                                st.rerun()
                                 
                             except Exception as e:
-                                st.session_state.auth_error = f"Failed to start authentication: {str(e)}"
-                                logger.error(f"Auth setup error: {e}")
-                                st.error(f"❌ Authentication setup failed: {str(e)}")
-                        else:
-                            st.session_state.auth_error = "Failed to initialize Google authentication"
-                            st.error("❌ Failed to initialize Google authentication")
+                                st.error("❌ Invalid authorization code. Please try again.")
+                                logger.error(f"Auth code error: {str(e)}")
+                    
                     except Exception as e:
-                        st.session_state.auth_error = f"Authentication failed: {str(e)}"
-                        logger.error(f"Authentication setup error: {str(e)}")
-                        st.error(f"❌ Authentication failed: {str(e)}")
-            
-            # Show code input if auth is in progress
-            if st.session_state.auth_in_progress and hasattr(st.session_state, 'auth_flow'):
-                auth_code = st.text_input(
-                    "Enter the code from Google:",
-                    help="After signing in, copy the code provided by Google",
-                    key="auth_code",
-                    type="password"  # Hide the code for security
-                )
-                
-                if auth_code:
-                    try:
-                        flow = st.session_state.auth_flow
-                        flow.fetch_token(code=auth_code)
-                        credentials = flow.credentials
-                        
-                        user_info = get_user_info(credentials)
-                        if not user_info:
-                            st.session_state.auth_error = "Failed to get user information"
-                            st.error("❌ Failed to get user information")
-                            st.stop()
-                        
-                        if save_credentials(credentials, user_info):
-                            st.success(f"✅ Welcome, {user_info['name']}!")
-                            st.rerun()
-                        else:
-                            st.error("❌ Failed to save credentials. Please try again.")
-                        
-                    except Exception as e:
-                        st.session_state.auth_error = f"Invalid code: {str(e)}"
-                        st.error("❌ Invalid code. Please try again.")
-                        logger.error(f"Auth code error: {str(e)}")
+                        auth_placeholder.error(f"❌ Authentication failed: {str(e)}")
+                        logger.error(f"Authentication error: {str(e)}")
+                else:
+                    st.error("❌ Failed to initialize Google authentication")
+            except Exception as e:
+                st.error(f"❌ Authentication failed: {str(e)}")
+                logger.error(f"Authentication setup error: {str(e)}")
         
         # Stop here if not authenticated
         st.stop()
