@@ -120,16 +120,23 @@ try:
             
             # Create temporary secrets file with proper format
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                if 'installed' in client_secrets:
-                    secrets_content = {'installed': client_secrets['installed']}
-                elif 'web' in client_secrets:
+                # Always use web application flow for browser-based auth
+                if 'web' in client_secrets:
                     secrets_content = {'web': client_secrets['web']}
+                elif 'installed' in client_secrets:
+                    # Convert installed to web format
+                    web_config = client_secrets['installed'].copy()
+                    web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                    secrets_content = {'web': web_config}
                 else:
-                    secrets_content = {'installed': client_secrets}
+                    # Create web format
+                    web_config = client_secrets.copy()
+                    web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                    secrets_content = {'web': web_config}
                 
                 json.dump(secrets_content, f)
                 temp_secrets_path = f.name
-                logger.info("Created temporary secrets file")
+                logger.info("Created temporary secrets file with web application flow")
             
             try:
                 # Create flow with required scopes
@@ -143,10 +150,10 @@ try:
                     ]
                 )
                 
-                # Configure flow for in-app authentication
+                # Configure flow for web authentication
                 flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback'
                 
-                logger.info("OAuth flow configured successfully")
+                logger.info("OAuth flow configured successfully for web application")
                 return flow
             finally:
                 if os.path.exists(temp_secrets_path):
