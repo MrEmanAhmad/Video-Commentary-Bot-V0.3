@@ -122,16 +122,28 @@ try:
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
                 # Always use web application flow for browser-based auth
                 if 'web' in client_secrets:
-                    secrets_content = {'web': client_secrets['web']}
+                    web_config = client_secrets['web'].copy()
+                    # Check if running on Railway
+                    if os.getenv('RAILWAY_STATIC_URL'):
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
+                    else:
+                        web_config['redirect_uris'] = ['http://localhost:8501']
+                    secrets_content = {'web': web_config}
                 elif 'installed' in client_secrets:
                     # Convert installed to web format
                     web_config = client_secrets['installed'].copy()
-                    web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                    if os.getenv('RAILWAY_STATIC_URL'):
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
+                    else:
+                        web_config['redirect_uris'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 else:
                     # Create web format
                     web_config = client_secrets.copy()
-                    web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                    if os.getenv('RAILWAY_STATIC_URL'):
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
+                    else:
+                        web_config['redirect_uris'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 
                 json.dump(secrets_content, f)
@@ -151,7 +163,10 @@ try:
                 )
                 
                 # Configure flow for web authentication
-                flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback'
+                if os.getenv('RAILWAY_STATIC_URL'):
+                    flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app'
+                else:
+                    flow.redirect_uri = 'http://localhost:8501'
                 
                 logger.info("OAuth flow configured successfully for web application")
                 return flow
