@@ -125,25 +125,31 @@ try:
                     web_config = client_secrets['web'].copy()
                     # Check if running on Railway
                     if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                        web_config['javascript_origins'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
                     else:
-                        web_config['redirect_uris'] = ['http://localhost:8501']
+                        web_config['redirect_uris'] = ['http://localhost:8501/oauth2callback']
+                        web_config['javascript_origins'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 elif 'installed' in client_secrets:
                     # Convert installed to web format
                     web_config = client_secrets['installed'].copy()
                     if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                        web_config['javascript_origins'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
                     else:
-                        web_config['redirect_uris'] = ['http://localhost:8501']
+                        web_config['redirect_uris'] = ['http://localhost:8501/oauth2callback']
+                        web_config['javascript_origins'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 else:
                     # Create web format
                     web_config = client_secrets.copy()
                     if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback']
+                        web_config['javascript_origins'] = ['https://video-commentary-bot-v0-3-production.up.railway.app']
                     else:
-                        web_config['redirect_uris'] = ['http://localhost:8501']
+                        web_config['redirect_uris'] = ['http://localhost:8501/oauth2callback']
+                        web_config['javascript_origins'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 
                 json.dump(secrets_content, f)
@@ -164,9 +170,9 @@ try:
                 
                 # Configure flow for web authentication
                 if os.getenv('RAILWAY_STATIC_URL'):
-                    flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app'
+                    flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback'
                 else:
-                    flow.redirect_uri = 'http://localhost:8501'
+                    flow.redirect_uri = 'http://localhost:8501/oauth2callback'
                 
                 logger.info("OAuth flow configured successfully for web application")
                 return flow
@@ -324,15 +330,15 @@ try:
             else:
                 logger.warning(f"✗ Missing {var} in environment")
         
-        # Try to load from railway.json if any variables are missing and file exists
+        # If not in environment, try railway.json
         if missing_vars and os.path.exists('railway.json'):
             logger.info("Some variables missing, loading from railway.json...")
             with open('railway.json', 'r') as f:
                 config = json.load(f)
-                for var in missing_vars:
-                    if var in config:
-                        os.environ[var] = str(config[var])
-                        logger.info(f"Loaded {var} from railway.json")
+            for var in missing_vars:
+                if var in config:
+                    os.environ[var] = str(config[var])
+                    logger.info(f"Loaded {var} from railway.json")
         
         # Final check for required variables
         still_missing = [var for var in required_vars if not os.getenv(var)]
