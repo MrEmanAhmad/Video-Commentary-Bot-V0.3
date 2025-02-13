@@ -1,0 +1,32 @@
+{
+  "OPENAI_API_KEY": "your-openai-api-key",
+  "DEEPSEEK_API_KEY": "your-deepseek-api-key",
+  "CLOUDINARY_CLOUD_NAME": "your-cloudinary-cloud-name",
+  "CLOUDINARY_API_KEY": "your-cloudinary-api-key",
+  "CLOUDINARY_API_SECRET": "your-cloudinary-api-secret",
+  "TELEGRAM_BOT_TOKEN": "your-telegram-bot-token",
+  "GOOGLE_APPLICATION_CREDENTIALS_JSON": {
+    "type": "service_account",
+    "project_id": "your-project-id",
+    "private_key_id": "your-private-key-id",
+    "private_key": "your-private-key",
+    "client_email": "your-client-email",
+    "client_id": "your-client-id",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "your-client-x509-cert-url",
+    "universe_domain": "googleapis.com"
+  },
+  "YOUTUBE_CLIENT_SECRETS": {
+    "installed": {
+      "client_id": "your-client-id",
+      "project_id": "your-project-id",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_secret": "your-client-secret",
+      "redirect_uris": ["http://localhost"]
+    }
+  }
+} 

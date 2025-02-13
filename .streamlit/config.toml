@@ -1,0 +1,76 @@
+[server]
+# Server settings
+enableCORS = false
+enableXsrfProtection = false
+headless = true
+maxUploadSize = 50
+maxMessageSize = 200
+enableWebsocketCompression = true
+runOnSave = true
+port = 8502
+address = "0.0.0.0"
+
+# Performance optimizations
+enableStaticServing = true
+maxCachedMessageAge = 300
+maxMessageSizeMB = 200
+fileWatcherType = "poll"
+
+[browser]
+gatherUsageStats = false
+serverAddress = "0.0.0.0"
+serverPort = 8502
+
+[theme]
+# Modern dark theme optimized for video content
+base = "dark"
+primaryColor = "#FF4B4B"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#262730"
+textColor = "#FAFAFA"
+font = "sans serif"
+
+# Accent colors for components
+successColor = "#00CC96"
+errorColor = "#FF4B4B"
+warningColor = "#FFA726"
+infoColor = "#2196F3"
+
+[logger]
+level = "info"
+messageFormat = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Enable file logging
+logFile = "streamlit_app.log"
+
+[runner]
+# Performance settings
+magicEnabled = true
+fastReruns = true
+enforceSerializableSessionState = false
+postScriptGC = true
+# Memory management
+handleWebsocketConnections = false
+maxCachedForwardRuns = 2
+
+[client]
+# UI settings
+showErrorDetails = true
+toolbarMode = "minimal"
+# Caching settings
+caching = true
+displayEnabled = true
+showSidebarNavigation = true
+
+[global]
+developmentMode = false
+disableWatchdogWarning = true
+suppressDeprecationWarnings = true
+showWarningOnDirectExecution = false
+
+[deprecation]
+showfileUploaderEncoding = false
+showImageFormat = false
+showPyplotGlobalUse = false
+
+[mapbox]
+token = ""  # Add your token if using maps 
