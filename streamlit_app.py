@@ -125,30 +125,30 @@ try:
                     web_config = client_secrets['web'].copy()
                     # Check if running on Railway
                     if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app']
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize']
                         web_config['javascript_origins'] = ['https://video-commentary-bot-v03-production.up.railway.app']
                     else:
-                        web_config['redirect_uris'] = ['http://localhost:8501']
+                        web_config['redirect_uris'] = ['http://localhost:8501/_stcore/authorize']
                         web_config['javascript_origins'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 elif 'installed' in client_secrets:
                     # Convert installed to web format
                     web_config = client_secrets['installed'].copy()
                     if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app']
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize']
                         web_config['javascript_origins'] = ['https://video-commentary-bot-v03-production.up.railway.app']
                     else:
-                        web_config['redirect_uris'] = ['http://localhost:8501']
+                        web_config['redirect_uris'] = ['http://localhost:8501/_stcore/authorize']
                         web_config['javascript_origins'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 else:
                     # Create web format
                     web_config = client_secrets.copy()
                     if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app']
+                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize']
                         web_config['javascript_origins'] = ['https://video-commentary-bot-v03-production.up.railway.app']
                     else:
-                        web_config['redirect_uris'] = ['http://localhost:8501']
+                        web_config['redirect_uris'] = ['http://localhost:8501/_stcore/authorize']
                         web_config['javascript_origins'] = ['http://localhost:8501']
                     secrets_content = {'web': web_config}
                 
@@ -170,9 +170,9 @@ try:
                 
                 # Configure flow for web authentication
                 if os.getenv('RAILWAY_STATIC_URL'):
-                    flow.redirect_uri = 'https://video-commentary-bot-v03-production.up.railway.app'
+                    flow.redirect_uri = 'https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize'
                 else:
-                    flow.redirect_uri = 'http://localhost:8501'
+                    flow.redirect_uri = 'http://localhost:8501/_stcore/authorize'
                 
                 logger.info("OAuth flow configured successfully for web application")
                 return flow
