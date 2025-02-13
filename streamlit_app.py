@@ -131,6 +131,7 @@ try:
                 
                 json.dump(secrets_content, f)
                 temp_secrets_path = f.name
+                logger.info("Created temporary secrets file")
             
             try:
                 # Create flow with required scopes
@@ -144,12 +145,18 @@ try:
                         'openid'
                     ]
                 )
-                # Set redirect URI to localhost with a random port
-                flow.redirect_uri = 'http://localhost:0'
+                
+                # Configure flow for browser popup
+                flow.redirect_uri = 'http://localhost:8502/oauth2callback'
+                flow.prompt = 'consent'
+                flow.authorization_prompt_message = ''
+                
+                logger.info("OAuth flow configured successfully")
                 return flow
             finally:
                 if os.path.exists(temp_secrets_path):
                     os.unlink(temp_secrets_path)
+                    logger.info("Cleaned up temporary secrets file")
         except Exception as e:
             logger.error(f"Error setting up Google auth flow: {e}")
             st.error(f"❌ Failed to set up Google authentication: {str(e)}")
@@ -183,33 +190,48 @@ try:
             try:
                 flow = get_google_auth_flow()
                 if flow:
-                    # Run the local server flow in a new window
-                    credentials = flow.run_local_server(port=0, authorization_prompt_message="")
+                    # Show loading message
+                    auth_placeholder = st.empty()
+                    auth_placeholder.info("🔄 Opening Google Sign-in window...")
                     
-                    # Get user info
-                    user_info = get_user_info(credentials)
-                    if not user_info:
-                        st.error("❌ Failed to get user information")
-                        st.stop()
-                    
-                    # Save credentials
-                    tokens_dir = Path.home() / '.video_bot' / 'tokens'
-                    tokens_dir.mkdir(parents=True, exist_ok=True)
-                    safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
-                    token_path = tokens_dir / f'{safe_email}_token.pickle'
-                    
-                    with open(token_path, 'wb') as token:
-                        pickle.dump(credentials, token)
-                    
-                    # Store in session state
-                    st.session_state.google_auth = credentials
-                    st.session_state.user_info = user_info
-                    st.success(f"✅ Successfully signed in as {user_info['email']}")
-                    st.rerun()
+                    try:
+                        # Run the local server flow in a new window
+                        credentials = flow.run_local_server(
+                            host='localhost',
+                            port=8502,
+                            authorization_prompt_message='',
+                            success_message='Authentication successful! You can close this window.',
+                            open_browser=True
+                        )
+                        
+                        # Get user info
+                        user_info = get_user_info(credentials)
+                        if not user_info:
+                            st.error("❌ Failed to get user information")
+                            st.stop()
+                        
+                        # Save credentials
+                        tokens_dir = Path.home() / '.video_bot' / 'tokens'
+                        tokens_dir.mkdir(parents=True, exist_ok=True)
+                        safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
+                        token_path = tokens_dir / f'{safe_email}_token.pickle'
+                        
+                        with open(token_path, 'wb') as token:
+                            pickle.dump(credentials, token)
+                        
+                        # Store in session state
+                        st.session_state.google_auth = credentials
+                        st.session_state.user_info = user_info
+                        auth_placeholder.success(f"✅ Successfully signed in as {user_info['email']}")
+                        st.rerun()
+                    except Exception as e:
+                        auth_placeholder.error(f"❌ Authentication failed: {str(e)}")
+                        logger.error(f"Authentication error: {str(e)}")
                 else:
                     st.error("❌ Failed to initialize Google authentication")
             except Exception as e:
                 st.error(f"❌ Authentication failed: {str(e)}")
+                logger.error(f"Authentication setup error: {str(e)}")
         
         # Stop here if not authenticated
         st.stop()
