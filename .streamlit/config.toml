@@ -4,17 +4,13 @@ enableCORS = false
 enableXsrfProtection = false
 headless = true
 maxUploadSize = 50
-maxMessageSize = 200
 enableWebsocketCompression = true
 runOnSave = true
 port = 8502
 address = "0.0.0.0"
 
 # Performance optimizations
-enableStaticServing = true
-maxCachedMessageAge = 300
-maxMessageSizeMB = 200
-fileWatcherType = "poll"
+enableStaticServing = false
 
 [browser]
 gatherUsageStats = false

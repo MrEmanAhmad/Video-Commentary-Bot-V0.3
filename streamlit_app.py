@@ -50,6 +50,31 @@ try:
         }
     )
     
+    def load_user_auth():
+        """Load user authentication from pickle file"""
+        try:
+            tokens_dir = Path.home() / '.video_bot' / 'tokens'
+            if not tokens_dir.exists():
+                return None
+            
+            # Try to find any valid token file
+            token_files = list(tokens_dir.glob('*_token.pickle'))
+            for token_path in token_files:
+                try:
+                    with open(token_path, 'rb') as token:
+                        credentials = pickle.load(token)
+                        if credentials and credentials.valid:
+                            return credentials
+                        if credentials and credentials.expired and credentials.refresh_token:
+                            credentials.refresh(Request())
+                            return credentials
+                except Exception as e:
+                    logger.warning(f"Failed to load token {token_path}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error loading auth: {e}")
+            return None
+    
     # Initialize session state for authentication
     if 'google_auth' not in st.session_state:
         st.session_state.google_auth = load_user_auth()
@@ -147,31 +172,6 @@ try:
             }
         except Exception as e:
             logger.error(f"Error getting user info: {e}")
-            return None
-
-    def load_user_auth():
-        """Load user authentication from pickle file"""
-        try:
-            tokens_dir = Path.home() / '.video_bot' / 'tokens'
-            if not tokens_dir.exists():
-                return None
-            
-            # Try to find any valid token file
-            token_files = list(tokens_dir.glob('*_token.pickle'))
-            for token_path in token_files:
-                try:
-                    with open(token_path, 'rb') as token:
-                        credentials = pickle.load(token)
-                        if credentials and credentials.valid:
-                            return credentials
-                        if credentials and credentials.expired and credentials.refresh_token:
-                            credentials.refresh(Request())
-                            return credentials
-                except Exception as e:
-                    logger.warning(f"Failed to load token {token_path}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error loading auth: {e}")
             return None
 
     # Show login interface if not authenticated
