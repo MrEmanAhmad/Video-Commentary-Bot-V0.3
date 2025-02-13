@@ -52,7 +52,7 @@ try:
     
     # Initialize session state for authentication
     if 'google_auth' not in st.session_state:
-        st.session_state.google_auth = None
+        st.session_state.google_auth = load_user_auth()
     if 'user_info' not in st.session_state:
         st.session_state.user_info = None
 
@@ -94,12 +94,6 @@ try:
                 st.error("❌ YouTube client secrets not found. Please check your configuration.")
                 return None
             
-            # Ensure client_secrets is a dictionary with proper format
-            if not isinstance(client_secrets, dict):
-                logger.error("Client secrets must be a dictionary")
-                st.error("❌ Invalid YouTube client secrets format")
-                return None
-            
             # Create temporary secrets file with proper format
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
                 # Ensure proper format for client secrets
@@ -108,11 +102,10 @@ try:
                 elif 'web' in client_secrets:
                     secrets_content = {'web': client_secrets['web']}
                 else:
-                    secrets_content = {'installed': client_secrets}  # Assume it's already in correct format
+                    secrets_content = {'installed': client_secrets}
                 
                 json.dump(secrets_content, f)
                 temp_secrets_path = f.name
-                logger.info("Created temporary secrets file with proper format")
             
             try:
                 # Create flow with required scopes
@@ -126,14 +119,12 @@ try:
                         'openid'
                     ]
                 )
-                logger.info("Successfully created OAuth flow")
+                # Set redirect URI to localhost with a random port
+                flow.redirect_uri = 'http://localhost:0'
                 return flow
             finally:
-                # Clean up temporary file
                 if os.path.exists(temp_secrets_path):
                     os.unlink(temp_secrets_path)
-                    logger.info("Cleaned up temporary secrets file")
-        
         except Exception as e:
             logger.error(f"Error setting up Google auth flow: {e}")
             st.error(f"❌ Failed to set up Google authentication: {str(e)}")
@@ -158,25 +149,50 @@ try:
             logger.error(f"Error getting user info: {e}")
             return None
 
+    def load_user_auth():
+        """Load user authentication from pickle file"""
+        try:
+            tokens_dir = Path.home() / '.video_bot' / 'tokens'
+            if not tokens_dir.exists():
+                return None
+            
+            # Try to find any valid token file
+            token_files = list(tokens_dir.glob('*_token.pickle'))
+            for token_path in token_files:
+                try:
+                    with open(token_path, 'rb') as token:
+                        credentials = pickle.load(token)
+                        if credentials and credentials.valid:
+                            return credentials
+                        if credentials and credentials.expired and credentials.refresh_token:
+                            credentials.refresh(Request())
+                            return credentials
+                except Exception as e:
+                    logger.warning(f"Failed to load token {token_path}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error loading auth: {e}")
+            return None
+
     # Show login interface if not authenticated
     if not st.session_state.google_auth:
         st.title("🎬 AI Video Commentary Bot")
         st.markdown("### Welcome! Please sign in with Google to continue")
         
-        if st.button("🔑 Sign in with Google"):
+        if st.button("🔑 Sign in with Google", key="google_signin"):
             try:
                 flow = get_google_auth_flow()
                 if flow:
-                    # Run the local server flow
-                    credentials = flow.run_local_server(port=0)
+                    # Run the local server flow in a new window
+                    credentials = flow.run_local_server(port=0, authorization_prompt_message="")
                     
-                    # Get user info first
+                    # Get user info
                     user_info = get_user_info(credentials)
                     if not user_info:
                         st.error("❌ Failed to get user information")
                         st.stop()
                     
-                    # Save credentials with user-specific filename
+                    # Save credentials
                     tokens_dir = Path.home() / '.video_bot' / 'tokens'
                     tokens_dir.mkdir(parents=True, exist_ok=True)
                     safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
@@ -209,13 +225,7 @@ try:
                 st.markdown(f"**{st.session_state.user_info['name']}**")
                 st.markdown(f"_{st.session_state.user_info['email']}_")
             if st.button("Sign Out"):
-                if st.session_state.user_info:
-                    # Remove user-specific token file
-                    safe_email = st.session_state.user_info['email'].replace('@', '_at_').replace('.', '_dot_')
-                    token_path = Path.home() / '.video_bot' / 'tokens' / f'{safe_email}_token.pickle'
-                    if token_path.exists():
-                        token_path.unlink()
-                
+                # Clear session state
                 st.session_state.google_auth = None
                 st.session_state.user_info = None
                 st.rerun()
