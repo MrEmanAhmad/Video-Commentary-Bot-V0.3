@@ -8,7 +8,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     PORT=8501 \
     RAILWAY_ENVIRONMENT=production \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    # Add OAuth redirect URI environment variable
+    OAUTH_REDIRECT_URI="/_stcore/authorize"
 
 # Create a non-root user
 RUN useradd -m -s /bin/bash app_user
@@ -187,4 +189,5 @@ CMD Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset & \
     --server.maxMessageSize=200 \
     --browser.gatherUsageStats=false \
     --theme.base=dark \
+    --server.baseUrlPath=${OAUTH_REDIRECT_URI} \
     streamlit_app.py 

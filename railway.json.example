@@ -19,14 +19,21 @@
     "universe_domain": "googleapis.com"
   },
   "YOUTUBE_CLIENT_SECRETS": {
-    "installed": {
+    "web": {
       "client_id": "your-client-id",
       "project_id": "your-project-id",
       "auth_uri": "https://accounts.google.com/o/oauth2/auth",
       "token_uri": "https://oauth2.googleapis.com/token",
       "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
       "client_secret": "your-client-secret",
-      "redirect_uris": ["http://localhost"]
+      "redirect_uris": [
+        "https://your-app-name.up.railway.app/_stcore/authorize",
+        "http://localhost:8501/_stcore/authorize"
+      ],
+      "javascript_origins": [
+        "https://your-app-name.up.railway.app",
+        "http://localhost:8501"
+      ]
     }
   }
 } 
