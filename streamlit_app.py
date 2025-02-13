@@ -136,16 +136,15 @@ try:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     temp_secrets_path,
                     scopes=[
-                        'https://www.googleapis.com/auth/youtube',
                         'https://www.googleapis.com/auth/youtube.upload',
-                        'https://www.googleapis.com/auth/userinfo.email',
+                        'https://www.googleapis.com/auth/youtube.force-ssl',
                         'https://www.googleapis.com/auth/userinfo.profile',
-                        'openid'
+                        'https://www.googleapis.com/auth/userinfo.email'
                     ]
                 )
                 
                 # Configure flow for in-app authentication
-                flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
+                flow.redirect_uri = 'http://localhost'
                 
                 logger.info("OAuth flow configured successfully")
                 return flow
@@ -191,8 +190,12 @@ try:
                     auth_placeholder.info("🔄 Preparing Google Sign-in...")
                     
                     try:
-                        # Get the authorization URL
-                        auth_url, _ = flow.authorization_url(prompt='consent')
+                        # Get the authorization URL with access type and prompt
+                        auth_url, _ = flow.authorization_url(
+                            access_type='offline',
+                            prompt='consent',
+                            include_granted_scopes='true'
+                        )
                         
                         # Show the authentication instructions
                         st.markdown("""
@@ -200,15 +203,20 @@ try:
                         1. Click the link below to open Google's sign-in page
                         2. Sign in with your Google account
                         3. Grant the required permissions
-                        4. Copy the authorization code
-                        5. Paste it in the input box below
+                        4. You will be redirected to a page that says 'Cannot reach this page'
+                        5. Copy the code from the URL (after 'code=') and paste it below
                         """)
                         
                         # Display the auth URL as a clickable link
                         st.markdown(f"[🔐 Click here to sign in with Google]({auth_url})")
                         
-                        # Add input for the authorization code
-                        auth_code = st.text_input("Enter the authorization code:", key="auth_code")
+                        # Add input for the authorization code with clear instructions
+                        st.info("After signing in, you'll be redirected to a page that cannot be reached. This is expected! Copy the code from the URL and paste it below.")
+                        auth_code = st.text_input(
+                            "Enter the authorization code from the URL:",
+                            help="Look for the code parameter in the URL after being redirected",
+                            key="auth_code"
+                        )
                         
                         if auth_code:
                             try:
