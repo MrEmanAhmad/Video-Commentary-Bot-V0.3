@@ -144,7 +144,7 @@ try:
                 )
                 
                 # Configure flow for in-app authentication
-                flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app'
+                flow.redirect_uri = 'https://video-commentary-bot-v0-3-production.up.railway.app/oauth2callback'
                 
                 logger.info("OAuth flow configured successfully")
                 return flow
