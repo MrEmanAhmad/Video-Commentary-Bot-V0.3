@@ -432,7 +432,7 @@ try:
                 # Show success message
                 st.success("✅ Successfully signed in!")
                 
-                # Redirect to the main page
+                # Get base URL for redirect
                 base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
                 if base_url:
                     main_url = f"https://{base_url}"
@@ -447,7 +447,9 @@ try:
                 # Clear parameters and redirect
                 st.query_params.clear()
                 st.experimental_set_query_params()
-                st.experimental_rerun()
+                
+                # Force reload to main page
+                st.switch_page("streamlit_app.py")
                 
             except Exception as e:
                 error_msg = f"Token fetch error: {e}"
