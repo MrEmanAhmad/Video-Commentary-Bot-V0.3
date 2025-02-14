@@ -123,36 +123,57 @@ try:
                 # Always use web application flow for browser-based auth
                 if 'web' in client_secrets:
                     web_config = client_secrets['web'].copy()
-                    # Check if running on Railway
-                    if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize']
-                        web_config['javascript_origins'] = ['https://video-commentary-bot-v03-production.up.railway.app']
-                    else:
-                        web_config['redirect_uris'] = ['http://localhost:8501/_stcore/authorize']
-                        web_config['javascript_origins'] = ['http://localhost:8501']
-                    secrets_content = {'web': web_config}
                 elif 'installed' in client_secrets:
                     # Convert installed to web format
                     web_config = client_secrets['installed'].copy()
-                    if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize']
-                        web_config['javascript_origins'] = ['https://video-commentary-bot-v03-production.up.railway.app']
-                    else:
-                        web_config['redirect_uris'] = ['http://localhost:8501/_stcore/authorize']
-                        web_config['javascript_origins'] = ['http://localhost:8501']
-                    secrets_content = {'web': web_config}
                 else:
                     # Create web format
                     web_config = client_secrets.copy()
-                    if os.getenv('RAILWAY_STATIC_URL'):
-                        web_config['redirect_uris'] = ['https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize']
-                        web_config['javascript_origins'] = ['https://video-commentary-bot-v03-production.up.railway.app']
-                    else:
-                        web_config['redirect_uris'] = ['http://localhost:8501/_stcore/authorize']
-                        web_config['javascript_origins'] = ['http://localhost:8501']
-                    secrets_content = {'web': web_config}
                 
-                json.dump(secrets_content, f)
+                # Get base URL from environment with fallback
+                base_url = os.getenv('RAILWAY_STATIC_URL')
+                if not base_url:
+                    # Try to get from request if available
+                    try:
+                        base_url = st.get_option('server.baseUrlPath')
+                        if base_url:
+                            if not base_url.startswith(('http://', 'https://')):
+                                base_url = f"https://{base_url}"
+                    except Exception as e:
+                        logger.warning(f"Could not get base URL from Streamlit options: {e}")
+                
+                # Fallback to localhost for development
+                if not base_url:
+                    base_url = 'http://localhost:8501'
+                
+                # Clean up base URL
+                base_url = base_url.rstrip('/')
+                
+                # Ensure HTTPS for production
+                if not base_url.startswith('https://') and 'localhost' not in base_url:
+                    base_url = f"https://{base_url.replace('http://', '')}"
+                
+                # Set redirect URI
+                redirect_uri = f"{base_url}/_stcore/authorize"
+                logger.info(f"Using redirect URI: {redirect_uri}")
+                
+                # Update web config
+                web_config['redirect_uris'] = [redirect_uri]
+                web_config['javascript_origins'] = [base_url]
+                
+                # Add required fields if missing
+                required_fields = ['auth_uri', 'token_uri', 'auth_provider_x509_cert_url']
+                for field in required_fields:
+                    if field not in web_config:
+                        web_config[field] = {
+                            'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
+                            'token_uri': 'https://oauth2.googleapis.com/token',
+                            'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs'
+                        }[field]
+                
+                # Write complete config
+                secrets_content = {'web': web_config}
+                json.dump(secrets_content, f, indent=2)
                 temp_secrets_path = f.name
                 logger.info("Created temporary secrets file with web application flow")
             
@@ -168,20 +189,17 @@ try:
                     ]
                 )
                 
-                # Configure flow for web authentication
-                if os.getenv('RAILWAY_STATIC_URL'):
-                    flow.redirect_uri = 'https://video-commentary-bot-v03-production.up.railway.app/_stcore/authorize'
-                else:
-                    flow.redirect_uri = 'http://localhost:8501/_stcore/authorize'
+                # Set redirect URI explicitly
+                flow.redirect_uri = redirect_uri
+                logger.info(f"OAuth flow configured with redirect URI: {redirect_uri}")
                 
-                logger.info("OAuth flow configured successfully for web application")
                 return flow
             finally:
                 if os.path.exists(temp_secrets_path):
                     os.unlink(temp_secrets_path)
                     logger.info("Cleaned up temporary secrets file")
         except Exception as e:
-            logger.error(f"Error setting up Google auth flow: {e}")
+            logger.error(f"Error setting up Google auth flow: {e}", exc_info=True)
             st.error(f"❌ Failed to set up Google authentication: {str(e)}")
             return None
 
@@ -204,48 +222,6 @@ try:
             logger.error(f"Error getting user info: {e}")
             return None
 
-    # Check for OAuth callback in URL parameters
-    if 'code' in st.query_params and not st.session_state.google_auth:
-        try:
-            flow = get_google_auth_flow()
-            if flow:
-                auth_code = st.query_params['code']
-                flow.fetch_token(code=auth_code)
-                credentials = flow.credentials
-                
-                # Get user info
-                user_info = get_user_info(credentials)
-                if not user_info:
-                    st.error("❌ Failed to get user information")
-                    st.stop()
-                
-                # Save credentials
-                tokens_dir = Path.home() / '.video_bot' / 'tokens'
-                tokens_dir.mkdir(parents=True, exist_ok=True)
-                safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
-                token_path = tokens_dir / f'{safe_email}_token.pickle'
-                
-                with open(token_path, 'wb') as token:
-                    pickle.dump(credentials, token)
-                
-                # Store in session state
-                st.session_state.google_auth = credentials
-                st.session_state.user_info = user_info
-                
-                # Clear URL parameters and redirect to main page
-                st.query_params.clear()
-                
-                # Show success message and redirect
-                st.success(f"✅ Successfully signed in as {user_info['email']}")
-                st.rerun()
-                
-        except Exception as e:
-            st.error(f"❌ Authentication failed: {str(e)}")
-            logger.error(f"OAuth callback error: {str(e)}")
-            # Clear params on error too
-            st.query_params.clear()
-            st.rerun()
-
     # Show login interface if not authenticated
     if not st.session_state.google_auth:
         st.title("🎬 AI Video Commentary Bot")
@@ -253,6 +229,7 @@ try:
         
         if st.button("🔑 Sign in with Google", key="google_signin"):
             try:
+                logger.info("Sign in button clicked, initializing OAuth flow...")
                 flow = get_google_auth_flow()
                 if flow:
                     # Show loading message
@@ -261,11 +238,15 @@ try:
                     
                     try:
                         # Get the authorization URL with access type and prompt
-                        auth_url, _ = flow.authorization_url(
+                        auth_url, state = flow.authorization_url(
                             access_type='offline',
                             prompt='consent',
                             include_granted_scopes='true'
                         )
+                        logger.info(f"Generated auth URL with state: {state}")
+                        
+                        # Store state in session for verification
+                        st.session_state['oauth_state'] = state
                         
                         # Show the authentication instructions
                         st.markdown("""
@@ -283,16 +264,124 @@ try:
                         st.info("After clicking the link, you'll be redirected back to this app automatically.")
                         
                     except Exception as e:
-                        auth_placeholder.error(f"❌ Authentication failed: {str(e)}")
-                        logger.error(f"Authentication error: {str(e)}")
+                        error_msg = f"Authentication error: {str(e)}"
+                        logger.error(error_msg, exc_info=True)
+                        auth_placeholder.error(f"❌ {error_msg}")
                 else:
-                    st.error("❌ Failed to initialize Google authentication")
+                    error_msg = "Failed to initialize Google authentication"
+                    logger.error(error_msg)
+                    st.error(f"❌ {error_msg}")
             except Exception as e:
-                st.error(f"❌ Authentication failed: {str(e)}")
-                logger.error(f"Authentication setup error: {str(e)}")
+                error_msg = f"Authentication setup error: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                st.error(f"❌ {error_msg}")
         
         # Stop here if not authenticated
         st.stop()
+
+    # Check for OAuth callback in URL parameters
+    if 'code' in st.query_params:
+        logger.info("Detected OAuth callback with authorization code")
+        try:
+            # Clear any existing error states
+            if 'oauth_error' in st.session_state:
+                del st.session_state.oauth_error
+            
+            flow = get_google_auth_flow()
+            if not flow:
+                raise ValueError("Failed to initialize OAuth flow")
+            
+            auth_code = st.query_params['code']
+            
+            # Enhanced state verification
+            if 'state' in st.query_params:
+                stored_state = st.session_state.get('oauth_state')
+                received_state = st.query_params['state']
+                
+                if not stored_state:
+                    logger.warning("No stored OAuth state found")
+                    raise ValueError("OAuth state not found. Please try signing in again.")
+                
+                if received_state != stored_state:
+                    logger.error(f"OAuth state mismatch. Expected: {stored_state}, Got: {received_state}")
+                    raise ValueError("Invalid OAuth state. Please try signing in again.")
+                
+                logger.info("OAuth state verification successful")
+            
+            # Fetch token with timeout handling
+            try:
+                logger.info("Fetching token with authorization code")
+                flow.fetch_token(code=auth_code)
+                credentials = flow.credentials
+                
+                if not credentials or not credentials.valid:
+                    raise ValueError("Failed to obtain valid credentials")
+                
+                logger.info("Successfully obtained credentials")
+                
+                # Get user info with retry
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        logger.info(f"Getting user info (attempt {attempt + 1}/{max_retries})")
+                        user_info = get_user_info(credentials)
+                        if user_info:
+                            break
+                        logger.warning(f"Failed to get user info on attempt {attempt + 1}")
+                    except Exception as e:
+                        logger.error(f"Error getting user info on attempt {attempt + 1}: {e}")
+                        if attempt == max_retries - 1:
+                            raise
+                
+                if not user_info:
+                    raise ValueError("Failed to get user information after multiple attempts")
+                
+                # Save credentials securely
+                logger.info(f"Saving credentials for user: {user_info['email']}")
+                tokens_dir = Path.home() / '.video_bot' / 'tokens'
+                tokens_dir.mkdir(parents=True, exist_ok=True)
+                safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
+                token_path = tokens_dir / f'{safe_email}_token.pickle'
+                
+                # Ensure atomic write
+                temp_token_path = token_path.with_suffix('.tmp')
+                try:
+                    with open(temp_token_path, 'wb') as token:
+                        pickle.dump(credentials, token)
+                    temp_token_path.replace(token_path)
+                    logger.info("Credentials saved successfully")
+                except Exception as e:
+                    logger.error(f"Failed to save credentials: {e}")
+                    if temp_token_path.exists():
+                        temp_token_path.unlink()
+                    raise
+                
+                # Update session state
+                st.session_state.google_auth = credentials
+                st.session_state.user_info = user_info
+                
+                # Clean up session state
+                if 'oauth_state' in st.session_state:
+                    del st.session_state.oauth_state
+                
+                # Show success and clear parameters
+                logger.info("Authentication successful, clearing parameters")
+                st.success(f"✅ Successfully signed in as {user_info['email']}")
+                st.query_params.clear()
+                st.rerun()
+                
+            except Exception as e:
+                logger.error(f"Token fetch error: {e}", exc_info=True)
+                raise ValueError(f"Failed to complete authentication: {str(e)}")
+                
+        except Exception as e:
+            error_msg = f"OAuth callback error: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            st.session_state.oauth_error = error_msg
+            st.error(f"❌ Authentication failed: {error_msg}")
+            # Clear params on error
+            st.query_params.clear()
+            st.rerun()
 
     # Show user info in sidebar if authenticated
     if st.session_state.user_info:

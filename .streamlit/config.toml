@@ -10,7 +10,7 @@ port = 8501
 address = "0.0.0.0"
 
 # Performance optimizations
-enableStaticServing = false
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
@@ -45,7 +45,7 @@ fastReruns = true
 enforceSerializableSessionState = false
 postScriptGC = true
 # Memory management
-handleWebsocketConnections = false
+handleWebsocketConnections = true
 maxCachedForwardRuns = 2
 
 [client]
