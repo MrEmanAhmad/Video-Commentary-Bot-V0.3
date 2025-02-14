@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     # Add OAuth redirect URI environment variable
     OAUTH_REDIRECT_URI="/_stcore/authorize" \
-    RAILWAY_PUBLIC_DOMAIN="video-commentary-bot-v0-3-production-0c7c.up.railway.app"
+    RAILWAY_PUBLIC_DOMAIN="video-commentary-bot-v03-production.up.railway.app"
 
 # Create a non-root user
 RUN useradd -m -s /bin/bash app_user
