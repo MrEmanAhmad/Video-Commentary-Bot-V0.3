@@ -64,8 +64,6 @@ suppressDeprecationWarnings = true
 showWarningOnDirectExecution = false
 
 [deprecation]
-showfileUploaderEncoding = false
-showImageFormat = false
 showPyplotGlobalUse = false
 
 [mapbox]
