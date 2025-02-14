@@ -13,6 +13,8 @@ fileWatcherType = "none"
 maxMessageSize = 200
 enableCookieBasedSessionHandling = true
 cookieSecret = "your-secret-key-here"
+sslCertFile = ""
+sslKeyFile = ""
 
 [browser]
 gatherUsageStats = false
@@ -42,11 +44,15 @@ postScriptGC = true
 showErrorDetails = true
 toolbarMode = "minimal"
 showSidebarNavigation = true
+caching = true
+displayEnabled = true
 
 [global]
 developmentMode = false
 suppressDeprecationWarnings = true
 showWarningOnDirectExecution = false
+disableWatchdogWarning = true
+showWidgetCallbackWarning = false
 
 [mapbox]
 token = ""

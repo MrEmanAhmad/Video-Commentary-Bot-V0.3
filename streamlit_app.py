@@ -348,17 +348,23 @@ try:
                 logger.info(f"Using redirect URI for token fetch: {flow.redirect_uri}")
                 
                 # Get current URL for authorization response
-                current_url = st.get_option('server.baseUrlPath', '')
-                if current_url and not current_url.startswith(('http://', 'https://')):
-                    if 'railway.app' in current_url or 'localhost' not in current_url:
-                        current_url = f"https://{current_url}"
-                    else:
-                        current_url = f"http://{current_url}"
+                base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+                if base_url:
+                    current_url = f"https://{base_url}"
+                else:
+                    current_url = st.get_option('server.baseUrlPath', '')
+                    if current_url and not current_url.startswith(('http://', 'https://')):
+                        if 'railway.app' in current_url or 'localhost' not in current_url:
+                            current_url = f"https://{current_url}"
+                        else:
+                            current_url = f"http://{current_url}"
                 
-                # Build full authorization response URL
-                auth_response = current_url
-                if auth_response:
-                    auth_response += '?' + '&'.join([f"{k}={v}" for k, v in st.query_params.items()])
+                # Ensure the URL ends with the callback path
+                if not current_url.endswith('/_stcore/authorize'):
+                    current_url = f"{current_url.rstrip('/')}/_stcore/authorize"
+                
+                # Build full authorization response URL with all query parameters
+                auth_response = current_url + '?' + '&'.join([f"{k}={v}" for k, v in st.query_params.items()])
                 logger.info(f"Using authorization response URL: {auth_response}")
                 
                 # Fetch token with explicit parameters
@@ -428,8 +434,21 @@ try:
                 # Show success message
                 st.success("✅ Successfully signed in!")
                 
-                # Clear parameters and rerun
+                # Redirect to the main page
+                base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+                if base_url:
+                    main_url = f"https://{base_url}"
+                else:
+                    main_url = st.get_option('server.baseUrlPath', '')
+                    if main_url and not main_url.startswith(('http://', 'https://')):
+                        if 'railway.app' in main_url or 'localhost' not in main_url:
+                            main_url = f"https://{main_url}"
+                        else:
+                            main_url = f"http://{main_url}"
+                
+                # Clear parameters and redirect
                 st.query_params.clear()
+                st.experimental_set_query_params()
                 st.experimental_rerun()
                 
             except Exception as e:
@@ -442,8 +461,9 @@ try:
             logger.error(error_msg, exc_info=True)
             st.session_state.oauth_error = error_msg
             st.error(f"❌ Authentication failed: {error_msg}")
-            # Clear params on error
+            # Clear params and redirect to main page
             st.query_params.clear()
+            st.experimental_set_query_params()
             st.experimental_rerun()
 
     # Show user info in sidebar if authenticated
