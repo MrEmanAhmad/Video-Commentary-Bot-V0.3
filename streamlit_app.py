@@ -153,11 +153,19 @@ try:
                 if not base_url.startswith('https://') and 'localhost' not in base_url:
                     base_url = f"https://{base_url.replace('http://', '')}"
                 
-                # Set redirect URI
+                # Set redirect URI with proper path handling for Railway
                 redirect_uri = f"{base_url}/_stcore/authorize"
+                if 'railway.app' in base_url:
+                    # Add Railway-specific headers for proper proxy handling
+                    os.environ['STREAMLIT_SERVER_HEADERS'] = json.dumps({
+                        'X-Forwarded-Proto': 'https',
+                        'X-Forwarded-Host': base_url.replace('https://', ''),
+                        'X-Forwarded-For': 'true'
+                    })
+                
                 logger.info(f"Using redirect URI: {redirect_uri}")
                 
-                # Update web config
+                # Update web config with proper routing
                 web_config['redirect_uris'] = [redirect_uri]
                 web_config['javascript_origins'] = [base_url]
                 
@@ -245,8 +253,9 @@ try:
                         )
                         logger.info(f"Generated auth URL with state: {state}")
                         
-                        # Store state in session for verification
+                        # Store state and redirect URI in session for verification
                         st.session_state['oauth_state'] = state
+                        st.session_state['redirect_uri'] = redirect_uri
                         
                         # Show the authentication instructions
                         st.markdown("""
@@ -360,18 +369,19 @@ try:
                 st.session_state.google_auth = credentials
                 st.session_state.user_info = user_info
                 
-                # Clean up session state
+                # Clean up session state and redirect
                 if 'oauth_state' in st.session_state:
                     del st.session_state.oauth_state
+                if 'redirect_uri' in st.session_state:
+                    del st.session_state.redirect_uri
                 
-                # Show success and clear parameters
-                logger.info("Authentication successful, clearing parameters")
-                st.success(f"✅ Successfully signed in as {user_info['email']}")
+                # Clear parameters and rerun
                 st.query_params.clear()
                 st.rerun()
                 
             except Exception as e:
-                logger.error(f"Token fetch error: {e}", exc_info=True)
+                error_msg = f"Token fetch error: {e}"
+                logger.error(error_msg, exc_info=True)
                 raise ValueError(f"Failed to complete authentication: {str(e)}")
                 
         except Exception as e:
@@ -430,10 +440,10 @@ try:
             logger.info("Some variables missing, loading from railway.json...")
             with open('railway.json', 'r') as f:
                 config = json.load(f)
-            for var in missing_vars:
-                if var in config:
-                    os.environ[var] = str(config[var])
-                    logger.info(f"Loaded {var} from railway.json")
+                for var in missing_vars:
+                    if var in config:
+                        os.environ[var] = str(config[var])
+                        logger.info(f"Loaded {var} from railway.json")
         
         # Final check for required variables
         still_missing = [var for var in required_vars if not os.getenv(var)]
