@@ -13,15 +13,13 @@ fileWatcherType = "none"
 maxMessageSize = 200
 enableCookieBasedSessionHandling = true
 cookieSecret = "${STREAMLIT_SERVER_COOKIE_SECRET}"
-sslCertFile = ""
-sslKeyFile = ""
+cookieExpiryDays = 30
 enableXFrameOptions = false
 
 [browser]
 gatherUsageStats = false
 serverAddress = "0.0.0.0"
 serverPort = 8501
-serverHeadless = true
 
 [theme]
 base = "dark"
@@ -44,7 +42,6 @@ postScriptGC = true
 [client]
 showErrorDetails = true
 toolbarMode = "minimal"
-showSidebarNavigation = true
 caching = true
 displayEnabled = true
 

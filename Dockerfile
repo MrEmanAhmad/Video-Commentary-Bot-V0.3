@@ -18,7 +18,7 @@ ENV PYTHONUNBUFFERED=1 \
     STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false \
     STREAMLIT_SERVER_MAX_MESSAGE_SIZE=200 \
     STREAMLIT_SERVER_HEADLESS=true \
-    STREAMLIT_SERVER_ADDRESS="0.0.0.0" \
+    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_PORT=8501 \
     STREAMLIT_BROWSER_GATHER_USAGE_STATS=false \
     STREAMLIT_THEME_BASE="dark" \
@@ -34,7 +34,8 @@ ENV PYTHONUNBUFFERED=1 \
     STREAMLIT_GLOBAL_SHOW_WARNING_ON_DIRECT_EXECUTION=false \
     STREAMLIT_GLOBAL_DISABLE_WATCHDOG_WARNING=true \
     STREAMLIT_GLOBAL_SHOW_WIDGET_CALLBACK_WARNING=false \
-    STREAMLIT_SERVER_ENABLE_XFRAME_OPTIONS=false
+    STREAMLIT_SERVER_ENABLE_XFRAME_OPTIONS=false \
+    STREAMLIT_SERVER_ENABLE_COOKIE_BASED_SESSION_HANDLING=true
 
 # Create a non-root user
 RUN useradd -m -s /bin/bash app_user
@@ -136,7 +137,7 @@ RUN mkdir -p \
     /home/app_user/.cache/selenium \
     /home/app_user/.config/chromium \
     /home/app_user/.config/google-chrome \
-    /home/app_user/.video_bot \
+    /home/app_user/.video_bot/tokens \
     /app/credentials \
     /app/analysis_temp \
     /app/sample_generated_videos \
@@ -159,7 +160,7 @@ RUN cp railway.json.example railway.json || true && \
     mkdir -p credentials && \
     cp credentials/google_credentials.example.json credentials/google_credentials.json || true
 
-# Set proper permissions
+# Set proper permissions before switching user
 RUN chown -R app_user:app_user \
     /app \
     /home/app_user/.streamlit \
@@ -175,7 +176,7 @@ RUN chown -R app_user:app_user \
     /home/app_user/.config \
     /home/app_user/.streamlit \
     /home/app_user/.cache \
-    /home/app_user/.video_bot
+    /home/app_user/.video_bot/tokens
 
 # Switch to non-root user
 USER app_user
@@ -193,7 +194,10 @@ ENV HOME=/home/app_user \
     FFREPORT=file=/app/analysis_temp/ffmpeg-%p-%t.log \
     # Chrome/Selenium settings
     SELENIUM_HEADLESS=true \
-    PYTHONWARNINGS="ignore:Unverified HTTPS request"
+    PYTHONWARNINGS="ignore:Unverified HTTPS request" \
+    STREAMLIT_SERVER_COOKIE_SECRET="${STREAMLIT_SERVER_COOKIE_SECRET}" \
+    STREAMLIT_SERVER_ENABLE_COOKIE_BASED_SESSION_HANDLING=true \
+    STREAMLIT_SERVER_COOKIE_EXPIRY_DAYS=30
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

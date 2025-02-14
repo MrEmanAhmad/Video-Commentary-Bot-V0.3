@@ -339,123 +339,102 @@ try:
                 logger.warning("No state parameter in callback")
                 raise ValueError("Missing state parameter. Please try signing in again.")
             
-            # Fetch token with timeout handling
-            try:
-                logger.info("Fetching token with authorization code")
-                
-                # Get current URL for authorization response
-                base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
-                if base_url:
-                    current_url = f"https://{base_url}"
-                    logger.info(f"Using Railway domain for callback: {current_url}")
-                else:
-                    current_url = st.get_option('server.baseUrlPath', '')
-                    if current_url and not current_url.startswith(('http://', 'https://')):
-                        if 'railway.app' in current_url or 'localhost' not in current_url:
-                            current_url = f"https://{current_url}"
-                        else:
-                            current_url = f"http://{current_url}"
-                    logger.info(f"Using base URL for callback: {current_url}")
-                
-                # Ensure the URL ends with the callback path
-                if not current_url.endswith('/_stcore/authorize'):
-                    current_url = f"{current_url.rstrip('/')}/_stcore/authorize"
-                
-                # Build full authorization response URL with all query parameters
-                auth_response = current_url + '?' + '&'.join([f"{k}={v}" for k, v in st.query_params.items()])
-                logger.info(f"Using authorization response URL: {auth_response}")
-                
-                # Fetch token with explicit parameters
-                flow.fetch_token(
-                    code=auth_code,
-                    authorization_response=auth_response
-                )
-                
-                credentials = flow.credentials
-                
-                if not credentials or not credentials.valid:
-                    logger.error("Failed to obtain valid credentials")
-                    raise ValueError("Failed to obtain valid credentials")
-                
-                logger.info("Successfully obtained credentials")
-                
-                # Get user info with retry
-                max_retries = 3
-                user_info = None
-                last_error = None
-                
-                for attempt in range(max_retries):
-                    try:
-                        logger.info(f"Getting user info (attempt {attempt + 1}/{max_retries})")
-                        user_info = get_user_info(credentials)
-                        if user_info:
-                            logger.info("Successfully retrieved user info")
-                            break
-                        logger.warning(f"Failed to get user info on attempt {attempt + 1}")
-                    except Exception as e:
-                        last_error = e
-                        logger.error(f"Error getting user info on attempt {attempt + 1}: {e}")
-                        if attempt == max_retries - 1:
-                            raise ValueError(f"Failed to get user information: {str(last_error)}")
-                
-                if not user_info:
-                    raise ValueError("Failed to get user information after multiple attempts")
-                
-                # Save credentials securely
-                logger.info(f"Saving credentials for user: {user_info['email']}")
-                tokens_dir = Path.home() / '.video_bot' / 'tokens'
-                tokens_dir.mkdir(parents=True, exist_ok=True)
-                safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
-                token_path = tokens_dir / f'{safe_email}_token.pickle'
-                
-                # Ensure atomic write
-                temp_token_path = token_path.with_suffix('.tmp')
+            # Get current URL for authorization response
+            base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+            if base_url:
+                current_url = f"https://{base_url}"
+                logger.info(f"Using Railway domain for callback: {current_url}")
+            else:
+                current_url = st.get_option('server.baseUrlPath', '')
+                if current_url and not current_url.startswith(('http://', 'https://')):
+                    if 'railway.app' in current_url or 'localhost' not in current_url:
+                        current_url = f"https://{current_url}"
+                    else:
+                        current_url = f"http://{current_url}"
+                logger.info(f"Using base URL for callback: {current_url}")
+            
+            # Ensure the URL ends with the callback path
+            if not current_url.endswith('/_stcore/authorize'):
+                current_url = f"{current_url.rstrip('/')}/_stcore/authorize"
+            
+            # Build full authorization response URL with all query parameters
+            auth_response = current_url + '?' + '&'.join([f"{k}={v}" for k, v in st.query_params.items()])
+            logger.info(f"Using authorization response URL: {auth_response}")
+            
+            # Fetch token with explicit parameters
+            flow.fetch_token(
+                code=auth_code,
+                authorization_response=auth_response
+            )
+            
+            credentials = flow.credentials
+            
+            if not credentials or not credentials.valid:
+                logger.error("Failed to obtain valid credentials")
+                raise ValueError("Failed to obtain valid credentials")
+            
+            logger.info("Successfully obtained credentials")
+            
+            # Get user info with retry
+            max_retries = 3
+            user_info = None
+            last_error = None
+            
+            for attempt in range(max_retries):
                 try:
-                    with open(temp_token_path, 'wb') as token:
-                        pickle.dump(credentials, token)
-                    temp_token_path.replace(token_path)
-                    logger.info("Credentials saved successfully")
+                    logger.info(f"Getting user info (attempt {attempt + 1}/{max_retries})")
+                    user_info = get_user_info(credentials)
+                    if user_info:
+                        logger.info("Successfully retrieved user info")
+                        break
+                    logger.warning(f"Failed to get user info on attempt {attempt + 1}")
                 except Exception as e:
-                    logger.error(f"Failed to save credentials: {e}")
-                    if temp_token_path.exists():
-                        temp_token_path.unlink()
-                    raise
-                
-                # Update session state
-                st.session_state.google_auth = credentials
-                st.session_state.user_info = user_info
-                
-                # Clean up session state
-                if 'oauth_state' in st.session_state:
-                    del st.session_state.oauth_state
-                
-                # Show success message
-                st.success("✅ Successfully signed in!")
-                
-                # Get base URL for redirect
-                base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
-                if base_url:
-                    main_url = f"https://{base_url}"
-                else:
-                    main_url = st.get_option('server.baseUrlPath', '')
-                    if main_url and not main_url.startswith(('http://', 'https://')):
-                        if 'railway.app' in main_url or 'localhost' not in main_url:
-                            main_url = f"https://{main_url}"
-                        else:
-                            main_url = f"http://{main_url}"
-                
-                # Clear parameters and redirect
-                st.query_params.clear()
-                st.experimental_set_query_params()
-                
-                # Force reload to main page
-                st.switch_page("streamlit_app.py")
-                
+                    last_error = e
+                    logger.error(f"Error getting user info on attempt {attempt + 1}: {e}")
+                    if attempt == max_retries - 1:
+                        raise ValueError(f"Failed to get user information: {str(last_error)}")
+            
+            if not user_info:
+                raise ValueError("Failed to get user information after multiple attempts")
+            
+            # Save credentials securely
+            logger.info(f"Saving credentials for user: {user_info['email']}")
+            tokens_dir = Path.home() / '.video_bot' / 'tokens'
+            tokens_dir.mkdir(parents=True, exist_ok=True)
+            safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
+            token_path = tokens_dir / f'{safe_email}_token.pickle'
+            
+            # Ensure atomic write
+            temp_token_path = token_path.with_suffix('.tmp')
+            try:
+                with open(temp_token_path, 'wb') as token:
+                    pickle.dump(credentials, token)
+                temp_token_path.replace(token_path)
+                logger.info("Credentials saved successfully")
             except Exception as e:
-                error_msg = f"Token fetch error: {e}"
-                logger.error(error_msg, exc_info=True)
-                raise ValueError(f"Failed to complete authentication: {str(e)}")
-                
+                logger.error(f"Failed to save credentials: {e}")
+                if temp_token_path.exists():
+                    temp_token_path.unlink()
+                raise
+            
+            # Update session state
+            st.session_state.google_auth = credentials
+            st.session_state.user_info = user_info
+            
+            # Clean up session state
+            if 'oauth_state' in st.session_state:
+                del st.session_state.oauth_state
+            
+            # Clear parameters and ensure they're removed from the URL
+            st.query_params.clear()
+            st.experimental_set_query_params()
+            
+            # Show success message
+            st.success("✅ Successfully signed in! Redirecting...")
+            
+            # Simple redirect to main page
+            st.rerun()
+            
         except Exception as e:
             error_msg = f"OAuth callback error: {str(e)}"
             logger.error(error_msg, exc_info=True)
