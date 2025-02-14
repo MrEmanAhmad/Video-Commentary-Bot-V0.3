@@ -205,12 +205,11 @@ try:
             return None
 
     # Check for OAuth callback in URL parameters
-    query_params = st.experimental_get_query_params()
-    if 'code' in query_params and not st.session_state.google_auth:
+    if 'code' in st.query_params and not st.session_state.google_auth:
         try:
             flow = get_google_auth_flow()
             if flow:
-                auth_code = query_params['code'][0]
+                auth_code = st.query_params['code']
                 flow.fetch_token(code=auth_code)
                 credentials = flow.credentials
                 
@@ -232,15 +231,20 @@ try:
                 # Store in session state
                 st.session_state.google_auth = credentials
                 st.session_state.user_info = user_info
-                st.success(f"✅ Successfully signed in as {user_info['email']}")
                 
                 # Clear URL parameters and redirect to main page
-                base_url = os.getenv('RAILWAY_STATIC_URL', 'http://localhost:8501')
-                st.experimental_set_query_params()
-                st.experimental_rerun()
+                st.query_params.clear()
+                
+                # Show success message and redirect
+                st.success(f"✅ Successfully signed in as {user_info['email']}")
+                st.rerun()
+                
         except Exception as e:
             st.error(f"❌ Authentication failed: {str(e)}")
             logger.error(f"OAuth callback error: {str(e)}")
+            # Clear params on error too
+            st.query_params.clear()
+            st.rerun()
 
     # Show login interface if not authenticated
     if not st.session_state.google_auth:
