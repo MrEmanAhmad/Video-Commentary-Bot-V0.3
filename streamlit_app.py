@@ -163,7 +163,8 @@ try:
                         'X-Forwarded-Proto': 'https',
                         'X-Forwarded-Host': base_url.replace('https://', ''),
                         'X-Forwarded-For': 'true',
-                        'Host': base_url.replace('https://', '')
+                        'Host': base_url.replace('https://', ''),
+                        'X-Real-IP': 'true'
                     })
                 
                 logger.info(f"Using redirect URI: {redirect_uri}")
