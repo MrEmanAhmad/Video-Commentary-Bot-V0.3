@@ -135,6 +135,21 @@ try:
                 if base_url:
                     base_url = f"https://{base_url}"
                     logger.info(f"Using Railway domain: {base_url}")
+                    
+                    # Add Railway-specific headers for proper proxy handling
+                    proxy_headers = {
+                        'X-Forwarded-Proto': 'https',
+                        'X-Forwarded-Host': base_url.replace('https://', ''),
+                        'X-Forwarded-For': 'true',
+                        'Host': base_url.replace('https://', ''),
+                        'X-Real-IP': 'true',
+                        'X-Forwarded-Port': '443',
+                        'X-Forwarded-Ssl': 'on',
+                        'X-Scheme': 'https',
+                        'X-Frame-Options': 'ALLOW'
+                    }
+                    os.environ['STREAMLIT_SERVER_HEADERS'] = json.dumps(proxy_headers)
+                    logger.info(f"Set Railway proxy headers: {proxy_headers}")
                 else:
                     # Try to get from request if available
                     try:
@@ -161,21 +176,6 @@ try:
                 # Set redirect URI with proper path handling
                 redirect_uri = f"{base_url}/_stcore/authorize"
                 logger.info(f"Setting redirect URI: {redirect_uri}")
-                
-                # Add Railway-specific headers for proper proxy handling
-                if 'railway.app' in base_url:
-                    proxy_headers = {
-                        'X-Forwarded-Proto': 'https',
-                        'X-Forwarded-Host': base_url.replace('https://', ''),
-                        'X-Forwarded-For': 'true',
-                        'Host': base_url.replace('https://', ''),
-                        'X-Real-IP': 'true',
-                        'X-Forwarded-Port': '443',
-                        'X-Forwarded-Ssl': 'on',
-                        'X-Scheme': 'https'
-                    }
-                    os.environ['STREAMLIT_SERVER_HEADERS'] = json.dumps(proxy_headers)
-                    logger.info(f"Set Railway proxy headers: {proxy_headers}")
                 
                 # Update web config with proper routing
                 web_config['redirect_uris'] = [redirect_uri]
@@ -343,14 +343,11 @@ try:
             try:
                 logger.info("Fetching token with authorization code")
                 
-                # Set the same redirect URI used in the initial request
-                flow.redirect_uri = flow.redirect_uri.rstrip('/')
-                logger.info(f"Using redirect URI for token fetch: {flow.redirect_uri}")
-                
                 # Get current URL for authorization response
                 base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
                 if base_url:
                     current_url = f"https://{base_url}"
+                    logger.info(f"Using Railway domain for callback: {current_url}")
                 else:
                     current_url = st.get_option('server.baseUrlPath', '')
                     if current_url and not current_url.startswith(('http://', 'https://')):
@@ -358,6 +355,7 @@ try:
                             current_url = f"https://{current_url}"
                         else:
                             current_url = f"http://{current_url}"
+                    logger.info(f"Using base URL for callback: {current_url}")
                 
                 # Ensure the URL ends with the callback path
                 if not current_url.endswith('/_stcore/authorize'):

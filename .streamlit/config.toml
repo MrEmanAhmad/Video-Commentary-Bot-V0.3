@@ -15,6 +15,7 @@ enableCookieBasedSessionHandling = true
 cookieSecret = "your-secret-key-here"
 sslCertFile = ""
 sslKeyFile = ""
+enableXFrameOptions = false
 
 [browser]
 gatherUsageStats = false
