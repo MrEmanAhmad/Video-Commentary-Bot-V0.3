@@ -11,6 +11,8 @@ enableStaticServing = true
 baseUrlPath = ""
 fileWatcherType = "none"
 maxMessageSize = 200
+enableCookieBasedSessionHandling = true
+cookieSecret = "your-secret-key-here"
 
 [browser]
 gatherUsageStats = false

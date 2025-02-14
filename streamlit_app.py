@@ -134,6 +134,7 @@ try:
                 base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
                 if base_url:
                     base_url = f"https://{base_url}"
+                    logger.info(f"Using Railway domain: {base_url}")
                 else:
                     # Try to get from request if available
                     try:
@@ -141,12 +142,14 @@ try:
                         if base_url:
                             if not base_url.startswith(('http://', 'https://')):
                                 base_url = f"https://{base_url}"
+                            logger.info(f"Using Streamlit base URL: {base_url}")
                     except Exception as e:
                         logger.warning(f"Could not get base URL from Streamlit options: {e}")
                 
                 # Fallback to localhost for development
                 if not base_url:
                     base_url = 'http://localhost:8501'
+                    logger.info("Using localhost fallback")
                 
                 # Clean up base URL
                 base_url = base_url.rstrip('/')
@@ -155,23 +158,30 @@ try:
                 if not base_url.startswith('https://') and 'localhost' not in base_url:
                     base_url = f"https://{base_url.replace('http://', '')}"
                 
-                # Set redirect URI with proper path handling for Railway
+                # Set redirect URI with proper path handling
                 redirect_uri = f"{base_url}/_stcore/authorize"
+                logger.info(f"Setting redirect URI: {redirect_uri}")
+                
+                # Add Railway-specific headers for proper proxy handling
                 if 'railway.app' in base_url:
-                    # Add Railway-specific headers for proper proxy handling
-                    os.environ['STREAMLIT_SERVER_HEADERS'] = json.dumps({
+                    proxy_headers = {
                         'X-Forwarded-Proto': 'https',
                         'X-Forwarded-Host': base_url.replace('https://', ''),
                         'X-Forwarded-For': 'true',
                         'Host': base_url.replace('https://', ''),
-                        'X-Real-IP': 'true'
-                    })
-                
-                logger.info(f"Using redirect URI: {redirect_uri}")
+                        'X-Real-IP': 'true',
+                        'X-Forwarded-Port': '443',
+                        'X-Forwarded-Ssl': 'on',
+                        'X-Scheme': 'https'
+                    }
+                    os.environ['STREAMLIT_SERVER_HEADERS'] = json.dumps(proxy_headers)
+                    logger.info(f"Set Railway proxy headers: {proxy_headers}")
                 
                 # Update web config with proper routing
                 web_config['redirect_uris'] = [redirect_uri]
                 web_config['javascript_origins'] = [base_url]
+                logger.info(f"Updated OAuth config with redirect URI: {redirect_uri}")
+                logger.info(f"Updated OAuth config with origins: {base_url}")
                 
                 # Add required fields if missing
                 required_fields = ['auth_uri', 'token_uri', 'auth_provider_x509_cert_url']
@@ -299,51 +309,90 @@ try:
             if 'oauth_error' in st.session_state:
                 del st.session_state.oauth_error
             
+            # Initialize flow with same settings
             flow = get_google_auth_flow()
             if not flow:
                 raise ValueError("Failed to initialize OAuth flow")
             
             auth_code = st.query_params['code']
+            logger.info("Received authorization code")
             
-            # Enhanced state verification
+            # Enhanced state verification with detailed logging
             if 'state' in st.query_params:
                 stored_state = st.session_state.get('oauth_state')
                 received_state = st.query_params['state']
                 
+                logger.info(f"Verifying OAuth state - Received: {received_state}")
+                
                 if not stored_state:
-                    logger.warning("No stored OAuth state found")
-                    raise ValueError("OAuth state not found. Please try signing in again.")
+                    logger.warning("No stored OAuth state found in session")
+                    raise ValueError("OAuth state not found in session. Please try signing in again.")
+                
+                logger.info(f"Stored state found: {stored_state}")
                 
                 if received_state != stored_state:
                     logger.error(f"OAuth state mismatch. Expected: {stored_state}, Got: {received_state}")
                     raise ValueError("Invalid OAuth state. Please try signing in again.")
                 
                 logger.info("OAuth state verification successful")
+            else:
+                logger.warning("No state parameter in callback")
+                raise ValueError("Missing state parameter. Please try signing in again.")
             
             # Fetch token with timeout handling
             try:
                 logger.info("Fetching token with authorization code")
-                flow.fetch_token(code=auth_code)
+                
+                # Set the same redirect URI used in the initial request
+                flow.redirect_uri = flow.redirect_uri.rstrip('/')
+                logger.info(f"Using redirect URI for token fetch: {flow.redirect_uri}")
+                
+                # Get current URL for authorization response
+                current_url = st.get_option('server.baseUrlPath', '')
+                if current_url and not current_url.startswith(('http://', 'https://')):
+                    if 'railway.app' in current_url or 'localhost' not in current_url:
+                        current_url = f"https://{current_url}"
+                    else:
+                        current_url = f"http://{current_url}"
+                
+                # Build full authorization response URL
+                auth_response = current_url
+                if auth_response:
+                    auth_response += '?' + '&'.join([f"{k}={v}" for k, v in st.query_params.items()])
+                logger.info(f"Using authorization response URL: {auth_response}")
+                
+                # Fetch token with explicit parameters
+                flow.fetch_token(
+                    code=auth_code,
+                    authorization_response=auth_response
+                )
+                
                 credentials = flow.credentials
                 
                 if not credentials or not credentials.valid:
+                    logger.error("Failed to obtain valid credentials")
                     raise ValueError("Failed to obtain valid credentials")
                 
                 logger.info("Successfully obtained credentials")
                 
                 # Get user info with retry
                 max_retries = 3
+                user_info = None
+                last_error = None
+                
                 for attempt in range(max_retries):
                     try:
                         logger.info(f"Getting user info (attempt {attempt + 1}/{max_retries})")
                         user_info = get_user_info(credentials)
                         if user_info:
+                            logger.info("Successfully retrieved user info")
                             break
                         logger.warning(f"Failed to get user info on attempt {attempt + 1}")
                     except Exception as e:
+                        last_error = e
                         logger.error(f"Error getting user info on attempt {attempt + 1}: {e}")
                         if attempt == max_retries - 1:
-                            raise
+                            raise ValueError(f"Failed to get user information: {str(last_error)}")
                 
                 if not user_info:
                     raise ValueError("Failed to get user information after multiple attempts")
@@ -372,13 +421,16 @@ try:
                 st.session_state.google_auth = credentials
                 st.session_state.user_info = user_info
                 
-                # Clean up session state and redirect
+                # Clean up session state
                 if 'oauth_state' in st.session_state:
                     del st.session_state.oauth_state
                 
+                # Show success message
+                st.success("✅ Successfully signed in!")
+                
                 # Clear parameters and rerun
                 st.query_params.clear()
-                st.rerun()
+                st.experimental_rerun()
                 
             except Exception as e:
                 error_msg = f"Token fetch error: {e}"
@@ -392,7 +444,7 @@ try:
             st.error(f"❌ Authentication failed: {error_msg}")
             # Clear params on error
             st.query_params.clear()
-            st.rerun()
+            st.experimental_rerun()
 
     # Show user info in sidebar if authenticated
     if st.session_state.user_info:
