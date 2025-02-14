@@ -190,5 +190,4 @@ CMD Xvfb :99 -screen 0 1280x1024x24 -ac +extension GLX +render -noreset & \
     --server.maxMessageSize=200 \
     --browser.gatherUsageStats=false \
     --theme.base=dark \
-    --server.baseUrlPath=${OAUTH_REDIRECT_URI} \
     streamlit_app.py 
