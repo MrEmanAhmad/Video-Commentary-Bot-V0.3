@@ -204,6 +204,44 @@ try:
             logger.error(f"Error getting user info: {e}")
             return None
 
+    # Check for OAuth callback in URL parameters
+    query_params = st.experimental_get_query_params()
+    if 'code' in query_params and not st.session_state.google_auth:
+        try:
+            flow = get_google_auth_flow()
+            if flow:
+                auth_code = query_params['code'][0]
+                flow.fetch_token(code=auth_code)
+                credentials = flow.credentials
+                
+                # Get user info
+                user_info = get_user_info(credentials)
+                if not user_info:
+                    st.error("❌ Failed to get user information")
+                    st.stop()
+                
+                # Save credentials
+                tokens_dir = Path.home() / '.video_bot' / 'tokens'
+                tokens_dir.mkdir(parents=True, exist_ok=True)
+                safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
+                token_path = tokens_dir / f'{safe_email}_token.pickle'
+                
+                with open(token_path, 'wb') as token:
+                    pickle.dump(credentials, token)
+                
+                # Store in session state
+                st.session_state.google_auth = credentials
+                st.session_state.user_info = user_info
+                st.success(f"✅ Successfully signed in as {user_info['email']}")
+                
+                # Clear URL parameters and redirect to main page
+                base_url = os.getenv('RAILWAY_STATIC_URL', 'http://localhost:8501')
+                st.experimental_set_query_params()
+                st.experimental_rerun()
+        except Exception as e:
+            st.error(f"❌ Authentication failed: {str(e)}")
+            logger.error(f"OAuth callback error: {str(e)}")
+
     # Show login interface if not authenticated
     if not st.session_state.google_auth:
         st.title("🎬 AI Video Commentary Bot")
@@ -238,44 +276,8 @@ try:
                         st.markdown(f"[🔐 Click here to sign in with Google]({auth_url})")
                         
                         # Add info about the process
-                        st.info("After clicking the link, you'll be redirected back to this app automatically. If you see any errors, please refresh this page.")
-                        auth_code = st.text_input(
-                            "Enter the authorization code from the URL:",
-                            help="Look for the code parameter in the URL after being redirected",
-                            key="auth_code"
-                        )
+                        st.info("After clicking the link, you'll be redirected back to this app automatically.")
                         
-                        if auth_code:
-                            try:
-                                # Exchange auth code for credentials
-                                flow.fetch_token(code=auth_code)
-                                credentials = flow.credentials
-                                
-                                # Get user info
-                                user_info = get_user_info(credentials)
-                                if not user_info:
-                                    st.error("❌ Failed to get user information")
-                                    st.stop()
-                                
-                                # Save credentials
-                                tokens_dir = Path.home() / '.video_bot' / 'tokens'
-                                tokens_dir.mkdir(parents=True, exist_ok=True)
-                                safe_email = user_info['email'].replace('@', '_at_').replace('.', '_dot_')
-                                token_path = tokens_dir / f'{safe_email}_token.pickle'
-                                
-                                with open(token_path, 'wb') as token:
-                                    pickle.dump(credentials, token)
-                                
-                                # Store in session state
-                                st.session_state.google_auth = credentials
-                                st.session_state.user_info = user_info
-                                st.success(f"✅ Successfully signed in as {user_info['email']}")
-                                st.rerun()
-                                
-                            except Exception as e:
-                                st.error("❌ Invalid authorization code. Please try again.")
-                                logger.error(f"Auth code error: {str(e)}")
-                    
                     except Exception as e:
                         auth_placeholder.error(f"❌ Authentication failed: {str(e)}")
                         logger.error(f"Authentication error: {str(e)}")
