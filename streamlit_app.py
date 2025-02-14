@@ -253,9 +253,8 @@ try:
                         )
                         logger.info(f"Generated auth URL with state: {state}")
                         
-                        # Store state and redirect URI in session for verification
+                        # Store only the state in session
                         st.session_state['oauth_state'] = state
-                        st.session_state['redirect_uri'] = redirect_uri
                         
                         # Show the authentication instructions
                         st.markdown("""
@@ -372,8 +371,6 @@ try:
                 # Clean up session state and redirect
                 if 'oauth_state' in st.session_state:
                     del st.session_state.oauth_state
-                if 'redirect_uri' in st.session_state:
-                    del st.session_state.redirect_uri
                 
                 # Clear parameters and rerun
                 st.query_params.clear()
