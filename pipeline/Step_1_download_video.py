@@ -34,7 +34,7 @@ class VideoDownloader:
         """
         self.output_dir = output_dir
         self.cookie_file = None
-        
+    
         # Twitter download methods to try in sequence
         self.twitter_download_methods = [
             {'format': 'best'},  # Default method
@@ -183,7 +183,7 @@ class VideoDownloader:
         else:
             logger.error(f"Unhandled Twitter error: {error_str}")
             return f"Failed to download tweet: {str(error)}"
-
+    
     def _normalize_url(self, url: str) -> str:
         """Normalize URL to ensure compatibility."""
         # Convert x.com to twitter.com
@@ -321,10 +321,10 @@ class VideoDownloader:
             # First extract info without downloading to check duration
             with yt_dlp.YoutubeDL({'quiet': True, 'cookiefile': cookie_file}) as ydl:
                 try:
-                    info = ydl.extract_info(url, download=False)
-                    if info and info.get('duration', 0) > MAX_VIDEO_DURATION:
-                        logger.error(f"Video duration ({info['duration']} seconds) exceeds maximum allowed duration ({MAX_VIDEO_DURATION} seconds)")
-                        return False, None, None
+                info = ydl.extract_info(url, download=False)
+                if info and info.get('duration', 0) > MAX_VIDEO_DURATION:
+                    logger.error(f"Video duration ({info['duration']} seconds) exceeds maximum allowed duration ({MAX_VIDEO_DURATION} seconds)")
+                    return False, None, None
                 except Exception as e:
                     logger.error(f"Error extracting video info: {str(e)}")
                     if is_twitter:
@@ -356,27 +356,27 @@ class VideoDownloader:
             else:
                 # Regular download for non-Twitter URLs
                 with yt_dlp.YoutubeDL(self._get_ydl_opts(is_twitter=False, cookie_file=cookie_file)) as ydl:
-                    info = ydl.extract_info(url, download=True)
-            
-            if info:
-                metadata = {
-                    'title': info.get('title', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'description': info.get('description', ''),
-                    'uploader': info.get('uploader', 'Unknown'),
-                    'view_count': info.get('view_count', 0),
-                    'like_count': info.get('like_count', 0),
+                info = ydl.extract_info(url, download=True)
+                
+                if info:
+                    metadata = {
+                        'title': info.get('title', 'Unknown'),
+                        'duration': info.get('duration', 0),
+                        'description': info.get('description', ''),
+                        'uploader': info.get('uploader', 'Unknown'),
+                        'view_count': info.get('view_count', 0),
+                        'like_count': info.get('like_count', 0),
                     'upload_date': info.get('upload_date', ''),
                     'source_url': url
-                }
+                    }
+                    
+                    # Save metadata
+                    metadata_file = self.output_dir / "video_metadata.json"
+                    with open(metadata_file, 'w', encoding='utf-8') as f:
+                        json.dump(metadata, f, indent=2, ensure_ascii=False)
+                    
+                    return True, metadata, self._sanitize_filename(info.get('title', 'video'))
                 
-                # Save metadata
-                metadata_file = self.output_dir / "video_metadata.json"
-                with open(metadata_file, 'w', encoding='utf-8') as f:
-                    json.dump(metadata, f, indent=2, ensure_ascii=False)
-                
-                return True, metadata, self._sanitize_filename(info.get('title', 'video'))
-            
         except Exception as e:
             logger.error(f"Download error: {str(e)}")
             raise
