@@ -131,8 +131,10 @@ try:
                     web_config = client_secrets.copy()
                 
                 # Get base URL from environment with fallback
-                base_url = os.getenv('RAILWAY_STATIC_URL')
-                if not base_url:
+                base_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+                if base_url:
+                    base_url = f"https://{base_url}"
+                else:
                     # Try to get from request if available
                     try:
                         base_url = st.get_option('server.baseUrlPath')
@@ -160,7 +162,8 @@ try:
                     os.environ['STREAMLIT_SERVER_HEADERS'] = json.dumps({
                         'X-Forwarded-Proto': 'https',
                         'X-Forwarded-Host': base_url.replace('https://', ''),
-                        'X-Forwarded-For': 'true'
+                        'X-Forwarded-For': 'true',
+                        'Host': base_url.replace('https://', '')
                     })
                 
                 logger.info(f"Using redirect URI: {redirect_uri}")

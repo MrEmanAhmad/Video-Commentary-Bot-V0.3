@@ -9,11 +9,13 @@ port = 8501
 address = "0.0.0.0"
 enableStaticServing = true
 baseUrlPath = ""
+fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false
 serverAddress = "0.0.0.0"
 serverPort = 8501
+serverHeadless = true
 
 [theme]
 base = "dark"
